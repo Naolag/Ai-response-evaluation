@@ -1,0 +1,34 @@
+# Response C
+
+| Field | Value |
+|---|---|
+| Source | Synthetic: written for this evaluation to represent a partial-spec failure pattern. Not the output of a named model. |
+| Style | Short, tidy |
+
+---
+
+Sort token indices by probability in descending order, then copy tokens into the output until the running total reaches `p`. The token that crosses the threshold is included.
+
+```python
+def top_p_filter(probs, p):
+    if not (0 < p <= 1):
+        raise ValueError("p must be in (0, 1]")
+
+    order = sorted(range(len(probs)), key=probs.__getitem__, reverse=True)
+
+    out = [0.0] * len(probs)
+    total = 0.0
+    for i in order:
+        out[i] = probs[i]
+        total += probs[i]
+        if total >= p:
+            break
+    return out
+```
+
+**Notes**
+
+- A new list is returned, so the input is not modified.
+- `ValueError` is raised for an invalid `p`.
+- The kept tokens retain their original probabilities. I left renormalization out because most samplers (for example `random.choices`) accept unnormalized weights and normalize internally, so dividing by the kept mass would be redundant work.
+- Time complexity is O(V log V).
