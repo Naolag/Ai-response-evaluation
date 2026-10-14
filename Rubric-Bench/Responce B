@@ -1,0 +1,48 @@
+# Response B
+
+| Field | Value |
+|---|---|
+| Source | Synthetic: written for this evaluation to represent a correct, concise answer. Not the output of a named model. |
+| Style | Short, direct |
+
+---
+
+Sort the tokens by probability (highest first) and keep adding them until the cumulative probability reaches `p`. The token that makes the sum reach `p` is **included**, because the nucleus is the *smallest* set whose mass is *at least* `p`. Then renormalize the kept tokens.
+
+```python
+def top_p_filter(probs, p):
+    if not 0.0 < p <= 1.0:
+        raise ValueError("p must be in the interval (0, 1]")
+
+    order = sorted(range(len(probs)), key=lambda i: probs[i], reverse=True)
+
+    kept = []
+    cumulative = 0.0
+    for i in order:
+        if probs[i] <= 0.0:
+            break  # never keep zero-probability tokens
+        kept.append(i)
+        cumulative += probs[i]
+        if cumulative >= p:
+            break
+
+    if not kept:
+        raise ValueError("probs contains no positive probability mass")
+
+    total = sum(probs[i] for i in kept)
+    result = [0.0] * len(probs)
+    for i in kept:
+        result[i] = probs[i] / total
+    return result
+```
+
+**Edge cases handled**
+
+- A single token with probability `>= p` returns a one-hot result, because the loop stops after the first token.
+- `p = 1.0`: if floating-point error leaves the cumulative sum slightly below 1, the loop simply runs through all positive-probability tokens, so nothing is wrongly dropped.
+- Zero-probability tokens are never kept.
+- Ties are broken by lower index first (Python's sort is stable, including with `reverse=True`).
+- The input is not modified; a new list is returned.
+- All-zero input raises `ValueError` instead of dividing by zero.
+
+Time is O(V log V) for the sort, with O(V) extra space.
