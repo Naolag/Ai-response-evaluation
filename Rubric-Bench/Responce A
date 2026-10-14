@@ -1,0 +1,71 @@
+# Response A
+
+| Field | Value |
+|---|---|
+| Source | Synthetic: written for this evaluation to represent a common failure pattern. Not the output of a named model. |
+| Style | Long, well-structured, confident |
+
+---
+
+## Approach
+
+Nucleus sampling, as defined in the original paper, keeps the most probable tokens **for as long as their cumulative probability does not exceed `p`**, and discards the rest. This guarantees that the retained mass never overshoots the threshold, which keeps the nucleus tight.
+
+The algorithm has four steps:
+
+1. **Validate** `p`.
+2. **Sort** token indices by probability, highest first.
+3. **Accumulate** probabilities, stopping before the cumulative sum would go past `p`.
+4. **Renormalize** the kept tokens so they sum to 1.
+
+## Implementation
+
+```python
+def top_p_filter(probs, p):
+    """Return a nucleus-filtered, renormalized copy of `probs`.
+
+    Args:
+        probs: list of floats, a probability distribution.
+        p: cumulative probability threshold in (0, 1].
+
+    Returns:
+        A new list of the same length that sums to 1.
+
+    Raises:
+        ValueError: if p is not in (0, 1].
+    """
+    if p <= 0 or p > 1:
+        raise ValueError("p must be in the interval (0, 1]")
+
+    indexed = sorted(enumerate(probs), key=lambda item: item[1], reverse=True)
+
+    cumulative = 0.0
+    kept = []
+    for index, prob in indexed:
+        if cumulative + prob > p:
+            break
+        cumulative += prob
+        kept.append((index, prob))
+
+    total = sum(prob for _, prob in kept)
+
+    result = [0.0] * len(probs)
+    for index, prob in kept:
+        result[index] = prob / total
+    return result
+```
+
+## Complexity
+
+| Quantity | Cost |
+|---|---|
+| Time | O(V log V), dominated by the sort |
+| Extra space | O(V) |
+
+## Edge cases handled
+
+- **Invalid `p`**: raises `ValueError` for `p <= 0` or `p > 1`.
+- **`p = 1.0`**: returns the original distribution unchanged, since every token fits within the threshold.
+- **Ties**: Python's sort is stable, so equal probabilities keep their original order.
+- **Input safety**: the input list is never modified; a new list is returned.
+- **Renormalization**: kept probabilities are divided by their total, so the output sums to 1.
